@@ -309,15 +309,9 @@ openllama-instruct:
 chai:
   datasets:
     - soda:
-        fraction: 0.1
+        fraction: 0.05
         input_max_length: 1024
     - chai_edit
-    - oasst_export:
-        lang: "bg,ca,cs,da,de,en,es,fr,hr,hu,it,nl,pl,pt,ro,ru,sl,sr,sv,uk" 
-        input_file_path: 2023-06-02_oasst_all_labels.jsonl.gz
-        val_split: 0.05
-        top_k: 1
-
 
 falcon-7b:
   dtype: bf16

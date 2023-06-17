@@ -71,7 +71,7 @@ class DialogueDataCollator:
         else:
             messages = list(messages)
             messages = format_pairs(messages, self.tokenizer.eos_token)
-#        return " ".join(messages)
+#        return "\n".join(messages)
         flatten_message = self.tokenizer(
             " ".join(messages),
             max_length=max_length,
@@ -138,11 +138,12 @@ class DialogueDataCollator:
 
     def __call__(self, features):
         
-#        lst_messages = []
-#        for messages in features:
-#            lst_messages.append(self.process_one(messages))
-#        return lst_messages
-#        
+        if 1:        
+            lst_messages = []
+            for messages in features:
+                lst_messages.append(self.process_one(messages))
+            return lst_messages
+        
         flatten_messages = []
         label_masks = []
         total_short_context = 0

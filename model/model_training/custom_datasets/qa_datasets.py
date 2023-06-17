@@ -267,8 +267,8 @@ class SODA(Dataset):
             data["dialogue"][0] = f"{dialogue_bg} {data['dialogue'][0]}"
             # Use only input_max_length characters
             truncated_dialogue = [k[:input_max_length] for k in data["dialogue"]]
-            questions = [q for idx, q in enumerate(truncated_dialogue) if idx % 2 == 0]
-            answers = [a for idx, a in enumerate(truncated_dialogue) if idx % 2 == 1]
+            questions = [f"User: {q}" for idx, q in enumerate(truncated_dialogue) if idx % 2 == 0]
+            answers = [f"Bot: {a}" for idx, a in enumerate(truncated_dialogue) if idx % 2 == 1]
             if len(questions) == 0 or len(questions) != len(answers):
                 return None
             return create_dataset_entry_qa(mode=self.mode, questions=questions, answers=answers)
@@ -673,33 +673,38 @@ class ChaiEditChatML(Dataset):
                 self.rows.append(row)
     
     def _process_sample(self, convo) -> DatasetEntry | None:
-        context = None
+        
         bot_role = convo[-1]['role']
         human_role = convo[-2]['role']
         start = 0
-       
-        if convo[0]['role'] == bot_role:
-            start = 1
-            context = f"Conversation between user: {human_role} and bot: {bot_role}.\n {bot_role} is talking: {convo[0]['content']}"
-        elif convo[0]['role'] == 'System':
-            if convo[1]['role'] == bot_role:
-                start = 2
-                context = f"Conversation between user: {human_role} and bot: {bot_role}.\n {bot_role}'s Persona: {convo[0]['content']}\n{bot_role} is talking: {convo[1]['content']}"
-            else:
-                start = 1
-                context = f"{bot_role}'s Persona: {convo[0]['content']}"
-        else:
-            start = 0
-            context = f"Conversation between user: {human_role} and bot: {bot_role}."
         
         questions = []
         answers = []
         
+        if convo[0]['role'] == bot_role:
+            start = 1
+            context = f"{bot_role}: {convo[0]['content']}"
+            questions.append("<START>")
+            answers.append(context)
+        elif convo[0]['role'] == 'System':
+            if convo[1]['role'] == bot_role:
+                start = 2
+                context = f"{bot_role}'s Persona: {convo[0]['content']}\n<START>"
+                questions.append(context)
+                answers.append(convo[1]['content'])
+            else:
+                start = 1
+                context = f"{bot_role}'s Persona: {convo[0]['content']}\n<START>"
+                questions.append(context)
+                answers.append("{bot_role}: hello, i am {bot_role}.")
+        else:
+            start = 0
+        
         for (i, turn) in enumerate(convo[start:]):
             if i % 2 == 0:
-                questions.append(turn['content'])
+                questions.append(f"{turn['role']}: {turn['content']}")
             else:
-                answers.append(turn['content'])
+                answers.append(f"{turn['role']}: {turn['content']}")
                 
         if len(questions) == 0 or len(answers) == 0 or len(questions) != len(answers):
             return None
@@ -708,7 +713,6 @@ class ChaiEditChatML(Dataset):
                 mode=self.mode,
                 questions=questions,
                 answers=answers,
-                context=context,
         )
     
     def __len__(self) -> int:
@@ -916,6 +920,6 @@ class WizardEvol(Dataset):
 
  
 if __name__=="__main__":
-#    ds = ChaiEditChatML(cache_dir="data_cache")
-    ds = WizardEvol(cache_dir="data_cache")
+    ds = ChaiEditChatML(cache_dir="data_cache")
+#    ds = WizardEvol(cache_dir="data_cache")
     import ipdb; ipdb.set_trace()

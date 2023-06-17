@@ -17,8 +17,8 @@ from pydantic.fields import ModelField
 
 
 QA_SPECIAL_TOKENS = {
-    "Question": "USER: ",
-    "Answer": "ASSISTANT: ",
+    "Question": "",
+    "Answer": "",
     "System": "",
 }
 
@@ -126,7 +126,6 @@ class DatasetEntrySft(DatasetEntry):
         system_add_length: bool = False,
     ) -> list[str]:
         output: list[str] = []
-
         for i, m in enumerate(self.conversation):
             if m.role == Role.prompter:
                 if use_system_tag and i + 1 < len(self.conversation):
@@ -141,7 +140,7 @@ class DatasetEntrySft(DatasetEntry):
                     system_tag = ""
                 output.append(f"{QA_SPECIAL_TOKENS['Question']}{m.text}")
             else:
-                output.append(f"{QA_SPECIAL_TOKENS['Answer']}{m.text}{eos_token}")
+                output.append(f"{QA_SPECIAL_TOKENS['Answer']}{m.text}")
 
         return output
 
