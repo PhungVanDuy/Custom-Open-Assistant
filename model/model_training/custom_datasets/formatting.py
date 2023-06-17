@@ -7,13 +7,21 @@ from typing import Literal, Optional
 from pydantic import BaseModel, validator
 from pydantic.fields import ModelField
 
+#QA_SPECIAL_TOKENS = {
+#    "Question": "<|prompter|>",
+#    "Answer": "<|assistant|>",
+#    "System": "<|system|>",
+#    "StartPrefix": "<|prefix_begin|>",
+#    "EndPrefix": "<|prefix_end|>",
+#}
+
+
 QA_SPECIAL_TOKENS = {
-    "Question": "<|prompter|>",
-    "Answer": "<|assistant|>",
-    "System": "<|system|>",
-    "StartPrefix": "<|prefix_begin|>",
-    "EndPrefix": "<|prefix_end|>",
+    "Question": "USER: ",
+    "Answer": "ASSISTANT: ",
+    "System": "",
 }
+
 
 
 def format_system_prefix(prefix, eos_token):
@@ -131,7 +139,7 @@ class DatasetEntrySft(DatasetEntry):
                     )
                 else:
                     system_tag = ""
-                output.append(f"{QA_SPECIAL_TOKENS['Question']}{m.text}{eos_token}{system_tag}")
+                output.append(f"{QA_SPECIAL_TOKENS['Question']}{m.text}")
             else:
                 output.append(f"{QA_SPECIAL_TOKENS['Answer']}{m.text}{eos_token}")
 
@@ -241,7 +249,7 @@ def format_pairs(
 ) -> list[str]:
     assert isinstance(pairs, list)
     conversations = [
-        "{}{}{}".format(QA_SPECIAL_TOKENS["Question" if i % 2 == 0 else "Answer"], pairs[i], eos_token)
+        "{}{}".format(QA_SPECIAL_TOKENS["Question" if i % 2 == 0 else "Answer"], pairs[i]) if i % 2 == 0 else "{}{}{}".format(QA_SPECIAL_TOKENS["Question" if i % 2 == 0 else "Answer"], pairs[i], eos_token)
         for i in range(len(pairs))
     ]
     if add_initial_reply_token:

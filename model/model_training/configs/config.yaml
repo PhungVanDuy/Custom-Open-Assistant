@@ -73,11 +73,9 @@ defaults:
   residual_dropout: 0.0
   use_flash_attention: false
   sort_by_length: false
-  use_system_prefix: false
+  use_system_prefix: true
   system_prefix:
-    "You are Joi, a large language model trained by Open-Assistant. Answer as
-    concisely as possible.\nKnowledge cutoff: 2021-09-01\nCurrent date:
-    2023-03-12"
+    "You are StableChat, a large language model trained by StabilityAI. This is a chat between a curious user and you (artificial intelligence assistant). The assistant gives helpful, detailed, and polite answers to the user's questions. "
   use_system_tag: false
   system_property_dropout: 0.5
   system_add_length: false
@@ -253,11 +251,79 @@ oasst-top1:
         val_split: 0.05
         top_k: 1
 
+oasst-mix:
+  datasets:
+    - oasst_export:
+        lang: "en"
+        input_file_path: 2023-06-02_oasst_all_labels.jsonl.gz
+        top_k: 1
+    - vicuna:
+        val_split: 0.05
+        max_val_set: 800
+        fraction: 1.0
+    - grade_school_math_instructions:
+        val_split: 0.05
+        fraction: 0.5
+    - code_alpaca:
+        val_split: 0.05
+        max_val_set: 250
+    - oa_leet10k:
+        val_split: 0.05
+        max_val_set: 250
+        fraction: 0.2
+    - camel:
+        val_split: 0.05
+        max_val_set: 250
+    - airoboros:
+        val_split: 0.05
+        max_val_set: 250
+    - wizard_evol:
+        val_split: 0.05
+        max_val_set: 250
+
+wizard-only:
+  datasets:
+    - wizard_evol:
+        val_split: 0.05
+        max_val_set: 250
+
+openllama-instruct:
+  dtype: fp16
+  log_dir: openllama-logdir
+  model_name: pvduy/openllama_13b_1T
+  output_dir: /mnt/hdd/duyphung/openllama-instruct-1t-vicuna-format
+  max_length: 4096
+  learning_rate: 1e-5
+  warmup_steps: 500
+  gradient_checkpointing: true
+  gradient_accumulation_steps: 1
+  per_device_train_batch_size: 2
+  per_device_eval_batch_size: 2
+  eval_steps: 12001
+  save_steps: 1000
+  num_train_epochs: 3
+  save_total_limit: 3
+  use_flash_attention: false
+
+
+chai:
+  datasets:
+    - soda:
+        fraction: 0.1
+        input_max_length: 1024
+    - chai_edit
+    - oasst_export:
+        lang: "bg,ca,cs,da,de,en,es,fr,hr,hu,it,nl,pl,pt,ro,ru,sl,sr,sv,uk" 
+        input_file_path: 2023-06-02_oasst_all_labels.jsonl.gz
+        val_split: 0.05
+        top_k: 1
+
+
 falcon-7b:
   dtype: bf16
   log_dir: "llama_log_7b"
   learning_rate: 1e-5
-  model_name: "tiiuae/falcon-7b"
+  model_name: "EleutherAI/gpt-j-6b"
   deepspeed_config: configs/zero_config_falcon.json
   output_dir: falcon
   weight_decay: 0.0
@@ -274,6 +340,8 @@ falcon-7b:
   use_flash_attention: false
   residual_dropout: 0.3
   residual_dropout_lima: true
+
+
 
 llama-7b:
   dtype: fp16
@@ -718,6 +786,29 @@ gpt-neox:
   per_device_eval_batch_size: 8
   residual_dropout: 0.0
   use_flash_attention: false
+
+
+gpt-j-6b:
+  dtype: bf16
+  log_dir: "gptj-6b"
+  learning_rate: 1e-5
+  model_name: "EleutherAI/gpt-j-6b"
+  deepspeed_config: configs/zero_config.json
+  output_dir: /mnt/hdd/duyphung/chai/gptj-oa-style-ak
+  weight_decay: 0.0
+  max_length: 768
+  warmup_steps: 100
+  gradient_checkpointing: true
+  gradient_accumulation_steps: 2
+  per_device_train_batch_size: 1
+  per_device_eval_batch_size: 1
+  eval_steps: 1000
+  save_steps: 5000
+  num_train_epochs: 2
+  save_total_limit: 2
+  use_flash_attention: false
+  residual_dropout: 0.0
+
 
 galactica-125m:
   learning_rate: 5e-5

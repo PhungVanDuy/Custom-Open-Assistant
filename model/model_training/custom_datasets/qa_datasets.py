@@ -18,6 +18,7 @@ from model_training.custom_datasets.formatting import DatasetEntry, create_datas
 from model_training.custom_datasets.utils import _filter_by_words
 from torch import Generator
 from torch.utils.data import Dataset, Subset, random_split
+from tqdm import tqdm
 
 # @agoryuno contributed this
 re_reference_remove = re.compile(r"\[\d+(?:,\s*\d+)*?\]")
@@ -520,10 +521,10 @@ class Vicuna(Dataset):
         self.mode = mode
 
         dataset = load_dataset(
-            "gozfarb/ShareGPT_Vicuna_unfiltered",
+            "anon8231489123/ShareGPT_Vicuna_unfiltered",
             cache_dir=cache_dir,
-            data_files=["ShareGPT_2023.05.02v0_unfiltered_cleaned_split.json"],
-            revision="7b8551404f3de5704d634e7516b9ff77be3e2700",
+            data_files=["ShareGPT_V3_unfiltered_cleaned_split_no_imsorry.json"],
+            revision="192ab2185289094fc556ec8ce5ce1e8e587154ca",
         )["train"]
 
         for data in dataset:
@@ -654,3 +655,267 @@ class GPTeacher_Roleplay(Dataset):
     def __getitem__(self, index: int) -> DatasetEntry:
         dialogue = self.rows[index]
         return dialogue
+
+
+class ChaiEditChatML(Dataset):
+    def __init__(self, cache_dir: str | Path, mode: str = "sft") -> None:
+        super().__init__()
+        self.rows = []
+        if mode not in ("sft", "rl"):
+            raise NotImplementedError(f"Currently only the modes 'sft' and 'rl' are implemented. Received {mode}.")
+        self.mode = mode
+        dataset = load_dataset(
+            "AlekseyKorshuk/edit_sft_data_v2_230417_143157-chatml"
+        )["train"].to_pandas()['conversation']
+        for (i, convo) in tqdm(enumerate(dataset), total=len(dataset)):
+            row = self._process_sample(convo)
+            if row is not None:
+                self.rows.append(row)
+    
+    def _process_sample(self, convo) -> DatasetEntry | None:
+        context = None
+        bot_role = convo[-1]['role']
+        human_role = convo[-2]['role']
+        start = 0
+       
+        if convo[0]['role'] == bot_role:
+            start = 1
+            context = f"Conversation between user: {human_role} and bot: {bot_role}.\n {bot_role} is talking: {convo[0]['content']}"
+        elif convo[0]['role'] == 'System':
+            if convo[1]['role'] == bot_role:
+                start = 2
+                context = f"Conversation between user: {human_role} and bot: {bot_role}.\n {bot_role}'s Persona: {convo[0]['content']}\n{bot_role} is talking: {convo[1]['content']}"
+            else:
+                start = 1
+                context = f"{bot_role}'s Persona: {convo[0]['content']}"
+        else:
+            start = 0
+            context = f"Conversation between user: {human_role} and bot: {bot_role}."
+        
+        questions = []
+        answers = []
+        
+        for (i, turn) in enumerate(convo[start:]):
+            if i % 2 == 0:
+                questions.append(turn['content'])
+            else:
+                answers.append(turn['content'])
+                
+        if len(questions) == 0 or len(answers) == 0 or len(questions) != len(answers):
+            return None
+        
+        return create_dataset_entry_qa(
+                mode=self.mode,
+                questions=questions,
+                answers=answers,
+                context=context,
+        )
+    
+    def __len__(self) -> int:
+        return len(self.rows)
+
+    def __getitem__(self, index: int) -> DatasetEntry:
+        dialogue = self.rows[index]
+        return dialogue
+
+
+class Airoboros(Dataset):
+    name = "airoboros"
+
+    @staticmethod
+    def process_conversations(
+        data: list[dict[str, None | str]], input_max_length: int
+    ) -> tuple[list[str], list[str]] | None:
+        role = None
+        messages = []
+        # drop conversations that start with Bot
+        if len(data["conversations"]) == 0 or data["conversations"][0]["from"] != "human":
+            return None
+        questions = []
+        answers = []
+        for line in data["conversations"]:
+            speaker = line["from"]  # 'human' or 'gpt'
+            message = line["value"]
+            if message is None or message == "":
+                if speaker == "gpt":
+                    return None
+                elif speaker == "human":
+                    # replace empty messages with one of the following
+                    message = random.choice(["...", "Please continue", "Go on", ""])
+            message = message.replace(r"\_", "_")
+            message = message.replace(r"\*", "*")
+            message = re_single_reference_remove.sub("", message)
+
+            if role != speaker:
+                if role is not None:
+                    if role == "human":
+                        questions.append("\n".join(messages)[:input_max_length])
+                    if role == "gpt":
+                        answers.append("\n".join(messages)[:input_max_length])
+                    messages = []
+                role = speaker
+            messages.append(message.strip())
+
+        if role is not None and len(messages) > 0:
+            if role == "human":
+                questions.append("\n".join(messages)[:input_max_length])
+            if role == "gpt":
+                answers.append("\n".join(messages)[:input_max_length])
+        return questions, answers
+
+    def __init__(self, cache_dir: str | Path, mode: str = "sft", input_max_length: int = 32*1024) -> None:
+        super().__init__()
+
+        self.pairs = []
+        if mode not in ("sft", "rl"):
+            raise NotImplementedError(f"Currently only the modes 'sft' and 'rl' are implemented. Received {mode}.")
+        self.mode = mode
+        dataset = load_dataset(
+            "jondurbin/airoboros-gpt4-1.2", data_files=['as_conversations.json']
+        )["train"]
+        for data in dataset:
+            if (qa := self.process_conversations(data, input_max_length=input_max_length)) is not None:
+                if len(qa[1]) > 0:
+                    self.pairs.append(create_dataset_entry_qa(mode=self.mode, questions=qa[0], answers=qa[1], lang="en"))
+
+    def __len__(self) -> int:
+        return len(self.pairs)
+
+    def __getitem__(self, index: int) -> DatasetEntry:
+        dialogue = self.pairs[index]
+        return dialogue
+
+
+class CamelChatML(Dataset):
+
+    @staticmethod
+    def process_conversations(
+        data: list[dict[str, None | str]], input_max_length: int
+    ) -> tuple[list[str], list[str]] | None:
+        role = None
+        messages = []
+        # drop conversations that start with Bot
+        if len(data["conversation"]) == 0 or data["conversation"][0]["role"] != "User":
+            return None
+        questions = []
+        answers = []
+        for line in data["conversation"]:
+            speaker = line["role"]
+            message = line["content"]
+            if message is None or message == "":
+                if speaker == "Assistant":
+                    return None
+                elif speaker == "human":
+                    message = random.choice(["...", "Please continue", "Go on", ""])
+            message = message.replace(r"\_", "_")
+            message = message.replace(r"\*", "*")
+            message = re_single_reference_remove.sub("", message)
+
+            if role != speaker:
+                if role is not None:
+                    if role == "User":
+                        questions.append("\n".join(messages)[:input_max_length])
+                    if role == "Assistant":
+                        answers.append("\n".join(messages)[:input_max_length])
+                    messages = []
+                role = speaker
+            messages.append(message.strip())
+
+        if role is not None and len(messages) > 0:
+            if role == "User":
+                questions.append("\n".join(messages)[:input_max_length])
+            if role == "Assistant":
+                answers.append("\n".join(messages)[:input_max_length])
+        
+        return questions, answers
+
+    def __init__(self, cache_dir: str | Path, mode: str = "sft", input_max_length: int = 32*1024) -> None:
+        super().__init__()
+
+        self.pairs = []
+        if mode not in ("sft", "rl"):
+            raise NotImplementedError(f"Currently only the modes 'sft' and 'rl' are implemented. Received {mode}.")
+        self.mode = mode
+        dataset = load_dataset(
+            "AlekseyKorshuk/camel-chatml",
+        )["train"]
+        for data in dataset:
+            if (qa := self.process_conversations(data, input_max_length=input_max_length)) is not None:
+                if len(qa[1]) > 0:
+                    self.pairs.append(DatasetEntry(questions=qa[0], answers=qa[1], lang="en"))
+
+    def __len__(self) -> int:
+        return len(self.pairs)
+
+    def __getitem__(self, index: int) -> DatasetEntry:
+        dialogue = self.pairs[index]
+        return dialogue
+
+
+class WizardEvol(Dataset):
+    name = "wizard_evol"
+
+    @staticmethod
+    def process_vicuna_conversations(
+        data: list[dict[str, None | str]], input_max_length: int
+    ) -> tuple[list[str], list[str]] | None:
+        role = None
+        messages = []
+        if len(data["conversations"]) == 0 or data["conversations"][0]["from"] != "human":
+            return None
+        questions = []
+        answers = []
+        for line in data["conversations"]:
+            speaker = line["from"]
+            message = line["value"]
+            if message is None or message == "":
+                if speaker == "gpt":
+                    return None
+                elif speaker == "human":
+                    message = random.choice(["...", "Please continue", "Go on", ""])
+            message = message.replace(r"\_", "_")
+            message = message.replace(r"\*", "*")
+            message = re_single_reference_remove.sub("", message)
+            if role != speaker:
+                if role is not None:
+                    if role == "human":
+                        questions.append("\n".join(messages)[:input_max_length])
+                    if role == "gpt":
+                        answers.append("\n".join(messages)[:input_max_length])
+                    messages = []
+                role = speaker
+            messages.append(message.strip())
+        if role is not None and len(messages) > 0:
+            if role == "human":
+                questions.append("\n".join(messages)[:input_max_length])
+            if role == "gpt":
+                answers.append("\n".join(messages)[:input_max_length])
+        return questions, answers
+
+    def __init__(self, cache_dir: str | Path, mode: str = "sft", input_max_length: int = 32*1024) -> None:
+        super().__init__()
+
+        self.pairs = []
+        if mode not in ("sft", "rl"):
+            raise NotImplementedError(f"Currently only the modes 'sft' and 'rl' are implemented. Received {mode}.")
+        self.mode = mode
+        dataset = load_dataset(
+            "WizardLM/WizardLM_evol_instruct_V2_196k",
+        )["train"]
+        for data in dataset:
+            if (qa := self.process_vicuna_conversations(data, input_max_length=input_max_length)) is not None:
+                if len(qa[1]) > 0:
+                    self.pairs.append(create_dataset_entry_qa(mode=self.mode, questions=qa[0], answers=qa[1], lang="en"))
+
+    def __len__(self) -> int:
+        return len(self.pairs)
+
+    def __getitem__(self, index: int) -> DatasetEntry:
+        dialogue = self.pairs[index]
+        return dialogue
+
+ 
+if __name__=="__main__":
+#    ds = ChaiEditChatML(cache_dir="data_cache")
+    ds = WizardEvol(cache_dir="data_cache")
+    import ipdb; ipdb.set_trace()

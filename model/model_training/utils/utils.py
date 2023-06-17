@@ -177,6 +177,7 @@ TOKENIZER_CONFIGS = {
     "codegen": TokenizerConfig(special_tokens=SpecialTokens("<|endoftext|>", sep_token="<|endoftext|>")),
     "pythia": TokenizerConfig(special_tokens=SpecialTokens("<|padding|>", "<|endoftext|>", "<|endoftext|>")),
     "gpt-neox": TokenizerConfig(special_tokens=SpecialTokens("<|padding|>", "<|endoftext|>", "<|endoftext|>")),
+    "gpt-j": TokenizerConfig(special_tokens=SpecialTokens("<|padding|>", "<|endoftext|>", "<|endoftext|>")),
     "llama": TokenizerConfig(special_tokens=SpecialTokens("</s>", "</s>", sep_token="<s>")),
     "cerebras": TokenizerConfig(special_tokens=SpecialTokens("<|endoftext|>", "<|endoftext|>", "<|endoftext|>")),
     "deberta-v3": TokenizerConfig(special_tokens=SpecialTokens("[PAD]", "[SEP]", sep_token="[CLS]")),
@@ -209,7 +210,7 @@ def get_tokenizer(conf) -> transformers.AutoTokenizer:
         # Only 13B has a tokenizer available on HF
         tokenizer_name = "cerebras/Cerebras-GPT-13B"
 
-    tokenizer = transformers.AutoTokenizer.from_pretrained(tokenizer_name, cache_dir=conf.cache_dir)
+    tokenizer = transformers.AutoTokenizer.from_pretrained(tokenizer_name, use_fast=False)
 
     tokenizer_config = match_tokenizer_name(conf.model_name)
 
@@ -233,9 +234,9 @@ def get_tokenizer(conf) -> transformers.AutoTokenizer:
         if "additional_special_tokens" not in tokenizer.special_tokens_map
         else tokenizer.special_tokens_map["additional_special_tokens"]
     )
-    additional_special_tokens = list(set(additional_special_tokens + list(QA_SPECIAL_TOKENS.values())))
+    # additional_special_tokens = list(set(additional_special_tokens + list(QA_SPECIAL_TOKENS.values())))
 
-    tokenizer.add_special_tokens({"additional_special_tokens": additional_special_tokens})
+    # tokenizer.add_special_tokens({"additional_special_tokens": additional_special_tokens})
 
     return tokenizer
 

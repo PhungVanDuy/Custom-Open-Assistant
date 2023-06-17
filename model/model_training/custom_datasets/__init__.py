@@ -21,6 +21,10 @@ from model_training.custom_datasets.qa_datasets import (
     Vicuna,
     WebGPT,
     load_alpaca_dataset,
+    ChaiEditChatML,
+    Airoboros,
+    CamelChatML,
+    WizardEvol
 )
 from model_training.custom_datasets.rank_datasets import AugmentedOA
 from model_training.custom_datasets.summarization import HFSummary, HFSummaryPairs, SummarizationDataset
@@ -172,6 +176,14 @@ def get_one_dataset(
         dataset = RedPajama(cache_dir=data_path, mode=mode, **kwargs)
     elif dataset_name == "gpteacher_roleplay":
         dataset = GPTeacher_Roleplay(cache_dir=data_path, mode=mode, **kwargs)
+    elif dataset_name == "chai_edit":
+        dataset = ChaiEditChatML(cache_dir=data_path, mode=mode, **kwargs)
+    elif dataset_name == "camel":
+        dataset = CamelChatML(cache_dir=data_path, mode=mode, **kwargs)
+    elif dataset_name == "airoboros":
+        dataset = Airoboros(cache_dir=data_path, mode=mode, **kwargs)
+    elif dataset_name == "wizard_evol":
+        dataset = WizardEvol(cache_dir=data_path, mode=mode, **kwargs)
     else:
         raise ValueError(f"Unknown dataset {dataset_name}")
 

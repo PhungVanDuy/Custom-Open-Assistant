@@ -184,7 +184,7 @@ def argument_parsing(notebook=False, notebook_args=None):
     parser.add_argument("--local_rank", type=int, default=-1)
     parser.add_argument("--deepspeed", action="store_true")
     parser.add_argument("--no-deepspeed", dest="deepspeed", action="store_false")
-    parser.add_argument("--wandb-entity", type=str, default="open-assistant")
+    parser.add_argument("--wandb-entity", type=str, default="pvduy")
     parser.add_argument("--resume_from_checkpoint", action="store_true", help="Resume from last saved checkpoint")
     parser.add_argument("--rng_seed", type=int, help="rng seed")
     parser.add_argument("--show_dataset_stats", action="store_true", help="Show dataset stats", default=False)
@@ -362,6 +362,14 @@ def main():
     )
 
     train, evals = get_dataset(training_conf)
+    
+    if 0:
+        samples = []
+        for i in range(len(train)):
+            samples.append(train_collate_fn([train[i]])[0])
+        import pandas as pd
+        df = pd.DataFrame.from_dict({"samples": samples})
+        import ipdb; ipdb.set_trace()
 
     show_dataset_stats = (training_conf.verbose or training_conf.show_dataset_stats) and (
         not training_conf.deepspeed or training_conf.local_rank == 0
