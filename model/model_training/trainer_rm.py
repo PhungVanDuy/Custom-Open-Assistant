@@ -134,7 +134,7 @@ def argument_parsing(notebook=False, notebook_args=None):
     parser.add_argument("--local_rank", type=int, default=-1)
     parser.add_argument("--deepspeed", action="store_true")
     parser.add_argument("--no-deepspeed", dest="deepspeed", action="store_false")
-    parser.add_argument("--wandb-entity", type=str, default="open-assistant")
+    parser.add_argument("--wandb-entity", type=str, default="pvduy")
     parser.add_argument("--resume_from_checkpoint", action="store_true", help="Resume from last saved checkpoint")
     parser.add_argument("--rng_seed", type=int, help="rng seed")
     parser.add_argument("--show_dataset_stats", action="store_true", help="Show dataset stats", default=False)
@@ -188,7 +188,6 @@ def main():
     init_rng(training_conf)
 
     tokenizer = get_tokenizer(training_conf)
-    model = get_model(training_conf, tokenizer)
 
     train, evals = get_dataset(training_conf, mode="rm")
     train_collate_fn = RankingDataCollator(
@@ -209,7 +208,8 @@ def main():
         system_property_dropout=training_conf.system_property_dropout,
         system_add_length=training_conf.system_add_length,
     )
-
+    
+    model = get_model(training_conf, tokenizer)
     show_dataset_stats = (training_conf.verbose or training_conf.show_dataset_stats) and (
         not training_conf.deepspeed or training_conf.local_rank == 0
     )

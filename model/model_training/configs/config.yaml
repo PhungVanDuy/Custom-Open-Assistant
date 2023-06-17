@@ -19,7 +19,7 @@ defaults:
   logging_steps: 10
   max_grad_norm: 2.0
   save_total_limit: 4
-  dtype: fp16
+  dtype: bf16
   eval_accumulation_steps:
   freeze_layer:
   datasets:
@@ -288,11 +288,11 @@ wizard-only:
         max_val_set: 250
 
 openllama-instruct:
-  dtype: fp16
+  dtype: bf16
   log_dir: openllama-logdir
   model_name: pvduy/openllama_13b_1T
   output_dir: /mnt/hdd/duyphung/openllama-instruct-1t-vicuna-format
-  max_length: 4096
+  max_length: 2048
   learning_rate: 1e-5
   warmup_steps: 500
   gradient_checkpointing: true

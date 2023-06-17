@@ -2,7 +2,7 @@
 
 #SBATCH --job-name=oa
 #SBATCH --partition=a100-cu117
-#SBATCH --nodes=8
+#SBATCH --nodes=12
 #SBATCH --gres=gpu:8
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=16
