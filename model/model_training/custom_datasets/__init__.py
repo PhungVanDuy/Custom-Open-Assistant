@@ -22,6 +22,7 @@ from model_training.custom_datasets.qa_datasets import (
     WebGPT,
     load_alpaca_dataset,
     ChaiEditChatML,
+    ChaiDavinciChatML,
     Airoboros,
     CamelChatML,
     WizardEvol
@@ -178,6 +179,8 @@ def get_one_dataset(
         dataset = GPTeacher_Roleplay(cache_dir=data_path, mode=mode, **kwargs)
     elif dataset_name == "chai_edit":
         dataset = ChaiEditChatML(cache_dir=data_path, mode=mode, **kwargs)
+    elif dataset_name == "chai_davinci":
+        dataset = ChaiDavinciChatML(cache_dir=data_path, mode=mode, **kwargs)
     elif dataset_name == "camel":
         dataset = CamelChatML(cache_dir=data_path, mode=mode, **kwargs)
     elif dataset_name == "airoboros":

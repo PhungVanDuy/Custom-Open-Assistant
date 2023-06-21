@@ -365,8 +365,10 @@ def main():
     
     if 0:
         samples = []
-        for i in range(len(train)):
-            samples.append(train_collate_fn([train[i]])[0])
+        import ipdb; ipdb.set_trace()
+        for i in range(10):
+            samples.append(train[i])
+        batch = train_collate_fn(samples)
         import pandas as pd
         df = pd.DataFrame.from_dict({"samples": samples})
         import ipdb; ipdb.set_trace()

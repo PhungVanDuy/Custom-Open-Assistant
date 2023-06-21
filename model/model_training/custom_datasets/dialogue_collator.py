@@ -25,7 +25,7 @@ class DialogueDataCollator:
     padding: Union[bool, str, PaddingStrategy] = True
     max_length: Optional[int] = None
     mix_length_threshold: Optional[int] = 256
-    mix_probability: Optional[float] = 0.6
+    mix_probability: Optional[float] = 1
     pad_to_multiple_of: Optional[int] = None
     samples_mixing: Optional[bool] = False
     random_offset_probability: Optional[float] = 0.5
@@ -50,167 +50,63 @@ class DialogueDataCollator:
 
     def process_one(self, messages, return_length=False):
         total_short_context_one = 0
-        if random.random() < self.random_offset_probability and not isinstance(messages, DatasetEntryLm):
-            truncation = TruncationStrategy.DO_NOT_TRUNCATE
-            max_length = None
-        else:
-            truncation = TruncationStrategy.LONGEST_FIRST
-            max_length = self.max_length
+        max_length = self.max_length
 
         pretrain_dataset = False
         if isinstance(messages, DatasetEntrySft):
-            messages = messages.get_formatted(
+            messages_formatted = messages.get_formatted(
                 eos_token=self.tokenizer.eos_token,
                 use_system_tag=self.use_system_tag,
                 system_property_dropout=self.system_property_dropout,
                 system_add_length=self.system_add_length,
             )
-        elif isinstance(messages, DatasetEntryLm):
-            messages = messages.text
-            pretrain_dataset = True
         else:
-            messages = list(messages)
-            messages = format_pairs(messages, self.tokenizer.eos_token)
-#        return "\n".join(messages)
-        flatten_message = self.tokenizer(
-            " ".join(messages),
-            max_length=max_length,
-            truncation=truncation,
-            padding=False,
-        )
-
-        if pretrain_dataset:
-            label_mask = np.ones(len(flatten_message.input_ids), dtype=bool)
-            return flatten_message, label_mask, 0
-
-        if return_length:
-            return min(len(flatten_message.input_ids), self.max_length)
-
-        message_indices: Optional[list[int]] = None
+            raise ValueError("DatasetEntrySft expected")
+        
+        label_mask = []
+        token_ids = [] 
+        messages_formatted = [x + "\n" if i != len(messages_formatted) - 1 else x + "<|endoftext|>" for (i, x) in enumerate(messages_formatted)]
+        token_ids_pre = self.tokenizer.batch_encode_plus(messages_formatted)["input_ids"]
         if self.label_masking:
-            # message_change_indices = np.cumsum([len(x) for x in messages])
-            # for each token an integer indicating the index of the message it belongs to. Just to create the label mask.
-            # Label mask is true when predicting a token that is part of the answer, false otherwise.
-            # TEXT:             Question: Hello, how are you? Answer: I am fine. Question: What is your name? Answer: My name is John.
-            # MESSAGE_INDICES:  0         0      0   0   0    1       1 1  1     2         2    2  2    2     3       3  3    3  3
-            # LABEL_MASK:       0         0      0   0   0    1       1 1  1     0         0    0  0    0     1       1  1    1  1
-
-            # If no result in next, we are predicting the last termination token(s)
-            # message_indices = list(
-            #     map(
-            #         lambda x: next((i for i, val in enumerate(message_change_indices) if val >= x)),
-            #         list(map(lambda x: x[1], flatten_message.offset_mapping)),
-            #     )
-            # )
-
-            prompter_token_id = self.tokenizer.convert_tokens_to_ids(QA_SPECIAL_TOKENS["Question"])
-            assistant_token_id = self.tokenizer.convert_tokens_to_ids(QA_SPECIAL_TOKENS["Answer"])
-            assert prompter_token_id >= 0 and assistant_token_id >= 0
-
-            message_indices = []
-            i = -1
-            for x in flatten_message.input_ids:
-                if x in (prompter_token_id, assistant_token_id):
-                    i += 1
-                message_indices.append(i)
-
-        input_length = len(flatten_message.input_ids)
-        if self.max_length and input_length > self.max_length:
-            offset = random.randint(0, input_length - self.max_length)
-            for k in flatten_message.keys():
-                v = flatten_message[k]
-                if isinstance(v, list) and len(v) == input_length:
-                    flatten_message[k] = v[offset : offset + self.max_length]
-            if message_indices:
-                message_indices = message_indices[offset : offset + self.max_length]
-
-        if self.label_masking:
-            label_mask = np.array(list(map(lambda x: x % 2 == 1, message_indices)))
-        else:
-            label_mask = np.ones(len(flatten_message.input_ids), dtype=bool)
-
-        label_mask[-1] = False  # make sure last token is inactive, has an effect only when truncating
-
-        if len(flatten_message.input_ids) < self.mix_length_threshold and self.samples_mixing:
-            total_short_context_one += len(flatten_message.input_ids)
-
-        return {k: v for k, v in flatten_message.items() if k != "offset_mapping"}, label_mask, total_short_context_one
+            count = 0
+            for (mess, tokens) in zip(messages.conversation, token_ids_pre):
+                count += 1
+                if mess.role == "assistant":
+                    label_mask.extend([1] * len(tokens))
+                    token_ids.extend(tokens)
+                else:
+                    label_mask.extend([0] * len(tokens))
+                    token_ids.extend(tokens)
+        attention_mask = [1] * len(token_ids)
+        assert len(token_ids) == len(label_mask) == len(attention_mask)
+        if len(token_ids) > max_length:
+            token_ids = token_ids[-max_length:]
+            label_mask = label_mask[-max_length:]
+            attention_mask = attention_mask[-max_length:]
+            
+        return token_ids, attention_mask, label_mask 
 
     def __call__(self, features):
         
-        if 1:        
-            lst_messages = []
-            for messages in features:
-                lst_messages.append(self.process_one(messages))
-            return lst_messages
-        
         flatten_messages = []
         label_masks = []
-        total_short_context = 0
+        attention_masks = []
         for messages in features:
-            flatten_message, label_mask, total_short_context_one = self.process_one(messages)
+            flatten_message, attention_mask, label_mask = self.process_one(messages)
             flatten_messages.append(flatten_message)
             label_masks.append(label_mask)
-            total_short_context += total_short_context_one
-
-        # packing
-        if total_short_context > 2 and self.samples_mixing:
-            _flatten_messages, _label_masks = [], []
-            prev_short_msg, prev_short_mask = None, None
-            for flatten_msg, label_mask in zip(flatten_messages, label_masks):
-                if len(flatten_msg.input_ids) < self.mix_length_threshold and random.random() > self.mix_probability:
-                    if prev_short_msg is not None:
-                        for key in flatten_msg.keys():
-                            flatten_msg[key] += prev_short_msg[key]
-                            flatten_msg[key] = flatten_msg[key][: self.max_length]
-                        label_mask = np.concatenate([label_mask, prev_short_mask])
-                        _label_masks.append(label_mask[: self.max_length])
-                        _flatten_messages.append(flatten_msg)
-                        # reset
-                        prev_short_msg, prev_short_mask = None, None
-                    else:
-                        # prime
-                        prev_short_msg, prev_short_mask = flatten_msg, label_mask
-                else:
-                    _label_masks.append(label_mask)
-                    _flatten_messages.append(flatten_msg)
-            if prev_short_msg is not None:
-                for key in flatten_msg.keys():
-                    flatten_msg[key] += prev_short_msg[key]
-                    flatten_msg[key] = flatten_msg[key][: self.max_length]
-                label_mask = np.concatenate([label_mask, prev_short_mask])[: self.max_length]
-                _label_masks.append(label_mask)
-                _flatten_messages.append(flatten_msg)
-
-            label_masks = _label_masks
-            flatten_messages = _flatten_messages
-
-        if self.use_system_prefix:
-            flatten_messages = [
-                {
-                    "input_ids": np.concatenate([self.system_prefix, flatten_msg["input_ids"]]),
-                    "attention_mask": np.concatenate(
-                        [np.ones_like(self.system_prefix).astype(bool), flatten_msg["attention_mask"]]
-                    ),
-                }
-                for flatten_msg in flatten_messages
-            ]
-            label_masks = [
-                np.concatenate([np.zeros_like(self.system_prefix).astype(bool), label_mask])
-                for label_mask in label_masks
-            ]
-
+            attention_masks.append(attention_mask)
+            
+        batch = {"input_ids": flatten_messages, "attention_mask": attention_masks}
         batch = self.tokenizer.pad(
-            flatten_messages,
+            batch,
             padding=self.padding,
             pad_to_multiple_of=self.pad_to_multiple_of,
             return_tensors="pt",
         )
+        batch["targets"] = torch.roll(batch.input_ids, -1, -1)
         dim = batch.input_ids.shape[-1]
-
         batch["label_masks"] = torch.stack(
             [F.pad(torch.tensor(x), (0, dim - len(x)), value=False) for x in label_masks]
         )
-        batch["targets"] = torch.roll(batch.input_ids, -1, -1)
-
         return batch

@@ -309,9 +309,9 @@ openllama-instruct:
 chai:
   datasets:
     - soda:
-        fraction: 0.05
         input_max_length: 1024
     - chai_edit
+    - chai_davinci
 
 falcon-7b:
   dtype: bf16
@@ -785,21 +785,21 @@ gpt-neox:
 gpt-j-6b:
   dtype: bf16
   log_dir: "gptj-6b"
-  learning_rate: 1e-5
-  model_name: "EleutherAI/gpt-j-6b"
+  learning_rate: 2e-5
+  model_name: "PygmalionAI/pygmalion-6b"
   deepspeed_config: configs/zero_config.json
-  output_dir: /mnt/hdd/duyphung/chai/gptj-oa-style-ak
+  output_dir: /mnt/hdd/duyphung/chai/pyg-oa-style-dp-filered-from-ak-maskfull-fix
   weight_decay: 0.0
   max_length: 768
-  warmup_steps: 100
+  warmup_steps: 50
   gradient_checkpointing: true
-  gradient_accumulation_steps: 2
-  per_device_train_batch_size: 1
+  gradient_accumulation_steps: 1
+  per_device_train_batch_size: 4
   per_device_eval_batch_size: 1
-  eval_steps: 1000
-  save_steps: 5000
-  num_train_epochs: 2
-  save_total_limit: 2
+  eval_steps: 100000
+  save_steps: 2000
+  num_train_epochs: 3 
+  save_total_limit: 3 
   use_flash_attention: false
   residual_dropout: 0.0
 
