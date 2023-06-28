@@ -365,7 +365,6 @@ def main():
     
     if 0:
         samples = []
-        import ipdb; ipdb.set_trace()
         for i in range(10):
             samples.append(train[i])
         batch = train_collate_fn(samples)

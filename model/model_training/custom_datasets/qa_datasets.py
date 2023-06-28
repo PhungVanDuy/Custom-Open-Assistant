@@ -666,7 +666,7 @@ class ChaiEditChatML(Dataset):
         self.mode = mode
         dataset = load_dataset(
             "pvduy/edit_sft_data_v2_230417_143157-chatml_filtered"
-        )["train"].to_pandas()['conversation']
+        )["train"].to_pandas().sample(frac=0.6)['conversation']
         for (i, convo) in tqdm(enumerate(dataset), total=len(dataset)):
             row = self._process_sample(convo)
             if row is not None:
@@ -788,6 +788,206 @@ class ChaiDavinciChatML(Dataset):
     def __getitem__(self, index: int) -> DatasetEntry:
         dialogue = self.rows[index]
         return dialogue
+
+
+class ChaiRoleplayChatML(Dataset):
+    def __init__(self, cache_dir: str | Path, mode: str = "sft") -> None:
+        super().__init__()
+        self.rows = []
+        if mode not in ("sft", "rl"):
+            raise NotImplementedError(f"Currently only the modes 'sft' and 'rl' are implemented. Received {mode}.")
+        self.mode = mode
+        dataset = load_dataset(
+            "AlekseyKorshuk/synthetic-role-play-chatml"
+        )["train"].to_pandas()['conversation']
+        for (i, convo) in tqdm(enumerate(dataset), total=len(dataset)):
+            row = self._process_sample(convo)
+            if row is not None:
+                self.rows.append(row)
+    
+    def _process_sample(self, convo) -> DatasetEntry | None:
+        
+        bot_role = convo[-1]['role']
+        human_role = convo[-2]['role']
+        start = 0
+        
+        questions = []
+        answers = []
+        
+        if convo[0]['role'] == bot_role:
+            start = 1
+            context = f"{bot_role}: {convo[0]['content']}"
+            questions.append("<START>")
+            answers.append(context)
+        elif convo[0]['role'] == 'System':
+            if convo[1]['role'] == bot_role:
+                start = 2
+                context = f"{bot_role}'s Persona: {convo[0]['content']}\n<START>"
+                questions.append(context)
+                answers.append(convo[1]['content'])
+            else:
+                start = 1
+                context = f"{bot_role}'s Persona: {convo[0]['content']}\n<START>"
+                questions.append(context)
+                answers.append(f"{bot_role}: hello, i am {bot_role}.")
+        else:
+            start = 0
+        
+        for (i, turn) in enumerate(convo[start:]):
+            if i % 2 == 0:
+                questions.append(f"{turn['role']}: {turn['content']}")
+            else:
+                answers.append(f"{turn['role']}: {turn['content']}")
+                
+        if len(questions) == 0 or len(answers) == 0 or len(questions) != len(answers):
+            return None
+        
+        return create_dataset_entry_qa(
+                mode=self.mode,
+                questions=questions,
+                answers=answers,
+        )
+    
+    def __len__(self) -> int:
+        return len(self.rows)
+
+    def __getitem__(self, index: int) -> DatasetEntry:
+        dialogue = self.rows[index]
+        return dialogue
+
+
+class ChaiInstructChatML(Dataset):
+    def __init__(self, cache_dir: str | Path, mode: str = "sft") -> None:
+        super().__init__()
+        self.rows = []
+        if mode not in ("sft", "rl"):
+            raise NotImplementedError(f"Currently only the modes 'sft' and 'rl' are implemented. Received {mode}.")
+        self.mode = mode
+        dataset = load_dataset(
+            "AlekseyKorshuk/camel-chatml"
+        )["train"].to_pandas().sample(n=50000)['conversation']
+        for (i, convo) in tqdm(enumerate(dataset), total=len(dataset)):
+            row = self._process_sample(convo)
+            if row is not None:
+                self.rows.append(row)
+    
+    def _process_sample(self, convo) -> DatasetEntry | None:
+        
+        bot_role = convo[-1]['role']
+        human_role = convo[-2]['role']
+        start = 0
+        
+        questions = []
+        answers = []
+        
+        if convo[0]['role'] == bot_role:
+            start = 1
+            context = f"{bot_role}: {convo[0]['content']}"
+            questions.append("<START>")
+            answers.append(context)
+        elif convo[0]['role'] == 'System':
+            if convo[1]['role'] == bot_role:
+                start = 2
+                context = f"{bot_role}'s Persona: {convo[0]['content']}\n<START>"
+                questions.append(context)
+                answers.append(convo[1]['content'])
+            else:
+                start = 1
+                context = f"{bot_role}'s Persona: {convo[0]['content']}\n<START>"
+                questions.append(context)
+                answers.append(f"{bot_role}: hello, i am {bot_role}.")
+        else:
+            start = 0
+        
+        for (i, turn) in enumerate(convo[start:]):
+            if i % 2 == 0:
+                questions.append(f"{turn['role']}: {turn['content']}")
+            else:
+                answers.append(f"{turn['role']}: {turn['content']}")
+                
+        if len(questions) == 0 or len(answers) == 0 or len(questions) != len(answers):
+            return None
+        
+        return create_dataset_entry_qa(
+                mode=self.mode,
+                questions=questions,
+                answers=answers,
+        )
+    
+    def __len__(self) -> int:
+        return len(self.rows)
+
+    def __getitem__(self, index: int) -> DatasetEntry:
+        dialogue = self.rows[index]
+        return dialogue
+
+
+
+class ChaiGPTChatML(Dataset):
+    def __init__(self, cache_dir: str | Path, mode: str = "sft") -> None:
+        super().__init__()
+        self.rows = []
+        if mode not in ("sft", "rl"):
+            raise NotImplementedError(f"Currently only the modes 'sft' and 'rl' are implemented. Received {mode}.")
+        self.mode = mode
+        dataset = load_dataset(
+            "AlekseyKorshuk/chai-chatgpt-fullserved-chatml-deduplicated"
+        )["train"].to_pandas()['conversation']
+        for (i, convo) in tqdm(enumerate(dataset), total=len(dataset)):
+            row = self._process_sample(convo)
+            if row is not None:
+                self.rows.append(row)
+    
+    def _process_sample(self, convo) -> DatasetEntry | None:
+        
+        bot_role = convo[-1]['role']
+        human_role = convo[-2]['role']
+        start = 0
+        
+        questions = []
+        answers = []
+        
+        if convo[0]['role'] == bot_role:
+            start = 1
+            context = f"{bot_role}: {convo[0]['content']}"
+            questions.append("<START>")
+            answers.append(context)
+        elif convo[0]['role'] == 'System':
+            if convo[1]['role'] == bot_role:
+                start = 2
+                context = f"{bot_role}'s Persona: {convo[0]['content']}\n<START>"
+                questions.append(context)
+                answers.append(convo[1]['content'])
+            else:
+                start = 1
+                context = f"{bot_role}'s Persona: {convo[0]['content']}\n<START>"
+                questions.append(context)
+                answers.append(f"{bot_role}: hello, i am {bot_role}.")
+        else:
+            start = 0
+        
+        for (i, turn) in enumerate(convo[start:]):
+            if i % 2 == 0:
+                questions.append(f"{turn['role']}: {turn['content']}")
+            else:
+                answers.append(f"{turn['role']}: {turn['content']}")
+                
+        if len(questions) == 0 or len(answers) == 0 or len(questions) != len(answers):
+            return None
+        
+        return create_dataset_entry_qa(
+                mode=self.mode,
+                questions=questions,
+                answers=answers,
+        )
+    
+    def __len__(self) -> int:
+        return len(self.rows)
+
+    def __getitem__(self, index: int) -> DatasetEntry:
+        dialogue = self.rows[index]
+        return dialogue
+
 
 
 class Airoboros(Dataset):

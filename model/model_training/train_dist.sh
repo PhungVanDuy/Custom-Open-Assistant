@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #SBATCH --job-name=oa
-#SBATCH --partition=a100-cu117
+#SBATCH --partition=g40
 #SBATCH --nodes=8
 #SBATCH --gres=gpu:8
 #SBATCH --ntasks-per-node=1
@@ -15,11 +15,9 @@
 source /opt/hpcx/hpcx-init.sh
 hpcx_load
 
-source /mnt/nvme/home/duyphung/.bashrc
-
 conda env list
 eval "$(conda shell.bash hook)"
-conda activate ax_env
+conda activate chat_env
 
 
 export NCCL_COLLNET_ENABLE=0
@@ -29,7 +27,7 @@ export MASTER_ADDR=$(scontrol show hostnames $SLURM_JOB_NODELIST | head -n 1)
 export MASTER_PORT=9901
 export WANDB_ENTITY=pvduy
 
-cd /mnt/nvme/home/duyphung/Custom-Open-Assistant/model/model_training
+cd /admin/home-duyphung/Custom-Open-Assistant/model/model_training/admin/home-duyphung/Custom-Open-Assistant/model/model_training 
 
 srun --jobid $SLURM_JOBID bash -c 'python -m torch.distributed.run \
     --nproc_per_node $GPUS_PER_NODE --nnodes $SLURM_NNODES --node_rank $SLURM_PROCID \

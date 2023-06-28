@@ -87,7 +87,6 @@ class DialogueDataCollator:
         return token_ids, attention_mask, label_mask 
 
     def __call__(self, features):
-        
         flatten_messages = []
         label_masks = []
         attention_masks = []
